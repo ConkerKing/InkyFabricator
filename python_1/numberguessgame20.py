@@ -1,177 +1,203 @@
 import tkinter as tk
 from tkinter import messagebox
 import random
+import time
 
-# -----------------------------
-# Global game state
-# -----------------------------
-difficulty_settings = {}
-number_to_guess = 0
-attempts_left = 0
-current_level = 1
-wrong_attempts = 0
+# =========================
+# Game Logic
+# =========================
+class NumberGuessingGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Number Guessing Game - Deluxe Edition")
+        self.root.geometry("480x500")
+        self.root.resizable(False, False)
 
+        self.score = 0
+        self.level = 1
+        self.attempts_left = 0
+        self.number_to_guess = 0
+        self.start_time = None
+        self.difficulty = None
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
-def get_riddle_hint(number):
-    """Generate a riddle-like hint for hard difficulty."""
-    hints = []
+        self.build_welcome_screen()
 
-    if number % 2 == 0:
-        hints.append("It’s an even number.")
-    else:
-        hints.append("It’s an odd number.")
+    # -------------------------
+    # Screen Builders
+    # -------------------------
+    def clear_screen(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
 
-    if number % 5 == 0:
-        hints.append("It’s a multiple of 5.")
-    elif number % 3 == 0:
-        hints.append("It’s divisible by 3.")
+    def build_welcome_screen(self):
+        self.clear_screen()
 
-    if number > 50:
-        hints.append("It’s greater than 50.")
-    else:
-        hints.append("It’s 50 or less.")
+        tk.Label(self.root, text="🎯 Number Guessing Game", font=("Arial", 20, "bold")).pack(pady=20)
+        tk.Label(self.root, text="Choose Difficulty:", font=("Arial", 14)).pack(pady=10)
 
-    if number < 10:
-        hints.append("It’s a single-digit number.")
-    elif number >= 90:
-        hints.append("It’s close to 100.")
+        tk.Button(self.root, text="Easy", width=15, font=("Arial", 12),
+                  command=lambda: self.start_game("Easy")).pack(pady=5)
+        tk.Button(self.root, text="Normal", width=15, font=("Arial", 12),
+                  command=lambda: self.start_game("Normal")).pack(pady=5)
+        tk.Button(self.root, text="Hard", width=15, font=("Arial", 12),
+                  command=lambda: self.start_game("Hard")).pack(pady=5)
 
-    return random.choice(hints)
+    def build_game_screen(self):
+        self.clear_screen()
 
+        tk.Label(self.root, text=f"Difficulty: {self.difficulty['name']}", font=("Arial", 14)).pack(pady=5)
+        tk.Label(self.root, text=f"Level {self.level}/{self.difficulty['levels']}", font=("Arial", 12)).pack()
+        tk.Label(self.root, text=f"Range: 1 to {self.range_max}", font=("Arial", 12)).pack()
 
-def setup_difficulty(choice):
-    """Set the parameters for the selected difficulty."""
-    global difficulty_settings
+        self.attempts_label = tk.Label(self.root, text=f"Attempts Left: {self.attempts_left}", font=("Arial", 12))
+        self.attempts_label.pack(pady=5)
 
-    if choice == "Easy":
-        difficulty_settings = {"name": "Easy", "levels": 3, "attempts": 10, "base_range": 10, "hint_type": "direct"}
-    elif choice == "Normal":
-        difficulty_settings = {"name": "Normal", "levels": 5, "attempts": 7, "base_range": 50, "hint_type": "mixed"}
-    else:
-        difficulty_settings = {"name": "Hard", "levels": 7, "attempts": 5, "base_range": 100, "hint_type": "riddle"}
+        self.score_label = tk.Label(self.root, text=f"Score: {self.score}", font=("Arial", 12))
+        self.score_label.pack()
 
-    start_level(1)
+        tk.Label(self.root, text="Enter your guess:", font=("Arial", 12)).pack(pady=10)
+        self.guess_entry = tk.Entry(self.root, font=("Arial", 14), justify="center")
+        self.guess_entry.pack()
+        self.guess_entry.focus()
 
+        tk.Button(self.root, text="Submit Guess", font=("Arial", 12), command=self.check_guess).pack(pady=10)
 
-def start_level(level):
-    """Initialize a new level."""
-    global number_to_guess, attempts_left, current_level, wrong_attempts
+        self.hint_label = tk.Label(self.root, text="", font=("Arial", 11), fg="blue")
+        self.hint_label.pack(pady=10)
 
-    current_level = level
-    wrong_attempts = 0
-    level_range = int(difficulty_settings["base_range"] * (level / difficulty_settings["levels"]))
-    number_to_guess = random.randint(1, level_range)
-    attempts_left = difficulty_settings["attempts"]
+        tk.Button(self.root, text="Quit", command=self.root.quit).pack(pady=10)
 
-    update_display(f"Level {level} — Range: 1 to {level_range}\nYou have {attempts_left} attempts.")
+    # -------------------------
+    # Game Setup
+    # -------------------------
+    def start_game(self, difficulty_name):
+        self.difficulty = self.get_difficulty(difficulty_name)
+        self.level = 1
+        self.score = 0
+        self.start_level()
 
-
-def check_guess():
-    """Handle the player's guess."""
-    global attempts_left, wrong_attempts, number_to_guess, current_level
-
-    guess = entry_guess.get().strip()
-
-    if not guess.isdigit():
-        update_display("⚠️ Please enter a valid number.")
-        return
-
-    guess = int(guess)
-    entry_guess.delete(0, tk.END)
-    wrong_attempts += 1
-    attempts_left -= 1
-
-    # Correct guess
-    if guess == number_to_guess:
-        if current_level < difficulty_settings["levels"]:
-            messagebox.showinfo("Correct!", f"🎉 You cleared Level {current_level}!")
-            start_level(current_level + 1)
+    def get_difficulty(self, name):
+        if name == "Easy":
+            return {"name": "Easy", "levels": 3, "attempts": 10, "base_range": 10, "hint_type": "direct"}
+        elif name == "Normal":
+            return {"name": "Normal", "levels": 5, "attempts": 7, "base_range": 50, "hint_type": "mixed"}
         else:
-            messagebox.showinfo("Victory!", "🏆 You completed all levels! You Win!")
-            reset_game()
-        return
+            return {"name": "Hard", "levels": 7, "attempts": 5, "base_range": 100, "hint_type": "riddle"}
 
-    # Incorrect guess
-    hint_type = difficulty_settings["hint_type"]
+    def start_level(self):
+        self.range_max = int(self.difficulty["base_range"] * (self.level / self.difficulty["levels"])) + 5
+        self.number_to_guess = random.randint(1, self.range_max)
+        self.attempts_left = self.difficulty["attempts"]
+        self.start_time = time.time()
 
-    if hint_type == "direct":
-        hint = "Too low! Try higher." if guess < number_to_guess else "Too high! Try lower."
+        self.build_game_screen()
 
-    elif hint_type == "mixed":
-        if wrong_attempts % 2 == 0:
-            hint = "Hint: Higher!" if guess < number_to_guess else "Hint: Lower!"
+    # -------------------------
+    # Hint System
+    # -------------------------
+    def is_prime(self, n):
+        if n < 2:
+            return False
+        for i in range(2, int(n ** 0.5) + 1):
+            if n % i == 0:
+                return False
+        return True
+
+    def get_riddle_hint(self, number):
+        clues = []
+        if self.is_prime(number):
+            clues.append("It’s a prime number.")
+        elif int(number ** 0.5) ** 2 == number:
+            clues.append("It’s a perfect square.")
+        elif number % 5 == 0:
+            clues.append("It’s divisible by 5.")
+        elif number % 3 == 0:
+            clues.append("It’s divisible by 3.")
+        elif number % 2 == 0:
+            clues.append("It’s an even number.")
         else:
-            hint = "No hint this time!"
+            clues.append("It’s an odd number.")
 
-    else:  # riddle
-        hint = get_riddle_hint(number_to_guess)
+        if number > 50:
+            clues.append("It’s greater than 50.")
+        else:
+            clues.append("It’s 50 or less.")
 
-    if attempts_left > 0:
-        update_display(f"{hint}\nAttempts left: {attempts_left}")
-    else:
-        messagebox.showwarning("Game Over", "💀 Out of attempts! Restarting...")
-        start_level(1)
+        return random.choice(clues)
+
+    def get_adaptive_hint(self, guess, target):
+        diff = abs(guess - target)
+        if diff == 0:
+            return "🎯 Spot on!"
+        elif diff <= 3:
+            return "🔥 Super hot!"
+        elif diff <= 10:
+            return "🌡️ Getting warm."
+        elif diff <= 20:
+            return "❄️ A bit chilly."
+        else:
+            return "🥶 Freezing cold."
+
+    # -------------------------
+    # Game Logic
+    # -------------------------
+    def check_guess(self):
+        guess_text = self.guess_entry.get().strip()
+        if not guess_text.isdigit():
+            messagebox.showwarning("Invalid Input", "Please enter a valid number.")
+            return
+
+        guess = int(guess_text)
+        self.attempts_left -= 1
+        self.attempts_label.config(text=f"Attempts Left: {self.attempts_left}")
+
+        if guess == self.number_to_guess:
+            elapsed = int(time.time() - self.start_time)
+            time_bonus = max(0, 10 - elapsed)
+            gained = (self.attempts_left * 10) + (self.level * 5) + time_bonus
+            self.score += gained
+
+            messagebox.showinfo("Correct!", f"🎉 You cleared Level {self.level}!\n"
+                                            f"You earned {gained} points.\n"
+                                            f"Total Score: {self.score}")
+            self.level += 1
+            if self.level > self.difficulty["levels"]:
+                self.show_victory_screen()
+            else:
+                self.start_level()
+            return
+
+        # Give adaptive hint
+        hint = self.get_adaptive_hint(guess, self.number_to_guess)
+
+        # Apply hint type logic
+        if self.difficulty["hint_type"] == "direct":
+            hint += " (Higher)" if guess < self.number_to_guess else " (Lower)"
+        elif self.difficulty["hint_type"] == "mixed" and self.attempts_left % 2 == 0:
+            hint += " (Hint: Higher)" if guess < self.number_to_guess else " (Hint: Lower)"
+        elif self.difficulty["hint_type"] == "riddle":
+            hint = self.get_riddle_hint(self.number_to_guess)
+
+        self.hint_label.config(text=hint)
+
+        if self.attempts_left <= 0:
+            messagebox.showerror("Game Over", "💀 Out of attempts! Restarting from Level 1.")
+            self.start_game(self.difficulty["name"])
+
+    def show_victory_screen(self):
+        self.clear_screen()
+        tk.Label(self.root, text="🏆 You Win!", font=("Arial", 24, "bold"), fg="green").pack(pady=30)
+        tk.Label(self.root, text=f"Final Score: {self.score}", font=("Arial", 16)).pack(pady=10)
+
+        tk.Button(self.root, text="Play Again", font=("Arial", 14),
+                  command=self.build_welcome_screen).pack(pady=20)
+        tk.Button(self.root, text="Quit", font=("Arial", 14), command=self.root.quit).pack(pady=10)
 
 
-def update_display(message):
-    """Update the on-screen message label."""
-    label_message.config(text=message)
-
-
-def reset_game():
-    """Return to the main menu."""
-    frame_game.pack_forget()
-    frame_menu.pack(pady=20)
-    update_display("")
-
-
-# -----------------------------
-# Tkinter UI Setup
-# -----------------------------
-window = tk.Tk()
-window.title("🎯 Number Guessing Game")
-window.geometry("400x400")
-window.resizable(False, False)
-
-# --- Main Menu ---
-frame_menu = tk.Frame(window)
-frame_menu.pack(pady=20)
-
-label_welcome = tk.Label(frame_menu, text="Welcome to the Number Guessing Game!", font=("Arial", 14))
-label_welcome.pack(pady=10)
-
-btn_easy = tk.Button(frame_menu, text="Easy", width=20, command=lambda: switch_to_game("Easy"))
-btn_normal = tk.Button(frame_menu, text="Normal", width=20, command=lambda: switch_to_game("Normal"))
-btn_hard = tk.Button(frame_menu, text="Hard", width=20, command=lambda: switch_to_game("Hard"))
-btn_easy.pack(pady=5)
-btn_normal.pack(pady=5)
-btn_hard.pack(pady=5)
-
-
-def switch_to_game(choice):
-    """Switch from menu to gameplay."""
-    frame_menu.pack_forget()
-    frame_game.pack(pady=20)
-    setup_difficulty(choice)
-
-
-# --- Game Screen ---
-frame_game = tk.Frame(window)
-
-label_message = tk.Label(frame_game, text="", font=("Arial", 12), wraplength=350, justify="center")
-label_message.pack(pady=20)
-
-entry_guess = tk.Entry(frame_game, font=("Arial", 12))
-entry_guess.pack(pady=10)
-
-btn_submit = tk.Button(frame_game, text="Submit Guess", command=check_guess)
-btn_submit.pack(pady=5)
-
-btn_back = tk.Button(frame_game, text="Back to Menu", command=reset_game)
-btn_back.pack(pady=5)
-
-# Start App
-window.mainloop()
+# =========================
+# Run the Game
+# =========================
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = NumberGuessingGame(root)
+    root.mainloop()

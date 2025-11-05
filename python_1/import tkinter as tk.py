@@ -1,6 +1,11 @@
 import random
 import sys
 import time
+from colorama import Fore, Style, init
+
+# Initialize colorama
+init(autoreset=True)
+
 
 # ================================
 # Utility Functions
@@ -13,28 +18,36 @@ def slow_print(text, delay=0.03):
     print()
 
 
+def countdown_timer(seconds):
+    """Simple countdown timer."""
+    for i in range(seconds, 0, -1):
+        print(Fore.CYAN + f"⏳ Time left: {i} sec", end="\r")
+        time.sleep(1)
+    print(Style.RESET_ALL)
+
+
 def get_ascii_banner():
     """Return a fancy ASCII banner."""
-    return """
+    return f"""{Fore.YELLOW}
  _   _                 _                  _____                      
 | \\ | |               | |                / ____|                     
 |  \\| |_   _ _ __ ___ | |__   ___ _ __  | |  __ _   _  ___  ___  ___ 
 | . ` | | | | '_ ` _ \\| '_ \\ / _ \\ '__| | | |_ | | | |/ _ \\/ _ \\/ __|
 | |\\  | |_| | | | | | | |_) |  __/ |    | |__| | |_| |  __/  __/\\__ \\
 |_| \\_|\\__,_|_| |_| |_|_.__/ \\___|_|     \\_____|\\__,_|\\___|\\___||___/
-"""
+{Style.RESET_ALL}"""
 
 
 def get_victory_banner():
     """Return ASCII art for victory."""
-    return """
+    return f"""{Fore.GREEN}
 __     ______  _    _   _      ____   _    _   _ 
 \\ \\   / / __ \\| |  | | | |    / __ \\ /\\ \\  | | | |
  \\ \\_/ / |  | | |  | | | |   | |  | /  \\ \\ | |_| |
   \\   /| |  | | |  | | | |   | |  |/ /\\ \\ \\|  _  |
    | | | |__| | |__| | | |___| |_/ / ____ \\ | | | |
    |_|  \\____/ \\____/  |______\\____/_/    \\_\\_| |_|
-"""
+{Style.RESET_ALL}"""
 
 
 # ================================
@@ -118,7 +131,8 @@ def setup_difficulty(choice):
             "levels": 3,
             "attempts": 10,
             "base_range": 10,
-            "hint_type": "direct"
+            "hint_type": "direct",
+            "timer": 0
         }
     elif choice == "2":
         return {
@@ -126,7 +140,8 @@ def setup_difficulty(choice):
             "levels": 5,
             "attempts": 7,
             "base_range": 50,
-            "hint_type": "mixed"
+            "hint_type": "mixed",
+            "timer": 25
         }
     else:
         return {
@@ -134,7 +149,8 @@ def setup_difficulty(choice):
             "levels": 7,
             "attempts": 5,
             "base_range": 100,
-            "hint_type": "riddle"
+            "hint_type": "riddle",
+            "timer": 20
         }
 
 
@@ -145,14 +161,14 @@ def play_level(level, difficulty, score):
     attempts_left = difficulty["attempts"]
     start_time = time.time()
 
-    slow_print(f"\nLevel {level} — Range: 1 to {level_range}")
+    slow_print(f"\n{Fore.CYAN}Level {level} — Range: 1 to {level_range}")
     slow_print(f"You have {attempts_left} attempts!")
 
     while attempts_left > 0:
         try:
             guess = int(input("Enter your guess: "))
         except ValueError:
-            print("Please enter a valid number.")
+            print(Fore.RED + "Please enter a valid number.")
             continue
 
         if guess == number_to_guess:
@@ -161,12 +177,12 @@ def play_level(level, difficulty, score):
             gained = (attempts_left * 10) + (level * 5) + time_bonus
             score += gained
 
-            slow_print(f"🎉 Correct! You cleared Level {level}!")
-            slow_print(f"🏅 You earned {gained} points (Total: {score})")
+            slow_print(Fore.GREEN + f"🎉 Correct! You cleared Level {level}!")
+            slow_print(Fore.YELLOW + f"🏅 You earned {gained} points (Total: {score})")
             return True, score
 
         attempts_left -= 1
-        print(get_adaptive_hint(guess, number_to_guess))
+        print(Fore.MAGENTA + get_adaptive_hint(guess, number_to_guess))
 
         if difficulty["hint_type"] == "direct":
             if guess < number_to_guess:
@@ -179,11 +195,17 @@ def play_level(level, difficulty, score):
             else:
                 print("Hint: The number is lower.")
         elif difficulty["hint_type"] == "riddle":
-            print(get_riddle_hint(number_to_guess))
+            print(Fore.BLUE + get_riddle_hint(number_to_guess))
 
-        print(f"Attempts left: {attempts_left}")
+        print(Fore.CYAN + f"Attempts left: {attempts_left}")
 
-    slow_print("\n💀 Out of attempts! Game over.")
+        if difficulty["timer"]:
+            elapsed = int(time.time() - start_time)
+            if elapsed > difficulty["timer"]:
+                slow_print(Fore.RED + "\n⏰ Time’s up! You ran out of time.")
+                return False, score
+
+    slow_print(Fore.RED + "\n💀 Out of attempts! Game over.")
     return False, score
 
 
@@ -203,11 +225,11 @@ def play_game():
     for level in range(1, difficulty["levels"] + 1):
         success, score = play_level(level, difficulty, score)
         if not success:
-            slow_print("Restarting from Level 1...")
+            slow_print(Fore.RED + "Restarting from Level 1...")
             return play_game()
 
     slow_print(get_victory_banner())
-    slow_print(f"🏆 Final Score: {score}")
+    slow_print(Fore.YELLOW + f"🏆 Final Score: {score}")
     slow_print("Thanks for playing!\n")
     sys.exit()
 
